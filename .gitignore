@@ -1,0 +1,15 @@
+# Local configuration (real paths, machine-specific) — never commit
+config.psd1
+
+# Runtime artifacts
+*.log
+locks/
+logs/
+
+# Dependencies and OS noise
+node_modules/
+.DS_Store
+Thumbs.db
+
+# AI assistant local config
+.continue/

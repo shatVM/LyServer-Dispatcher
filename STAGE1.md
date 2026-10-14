@@ -1,53 +1,65 @@
-# Stage 1: Status and Test Plan
+# Stage 1: Status, review, and test plan
 
 ## Goal
 
-Stage 1 validates configuration and dependencies, checks repository safety, tests model availability, discovers eligible GitHub issues, and displays a preview. It does not execute issue work.
+Stage 1 is a safe preflight and preview run. It validates local configuration and dependencies, checks repository safety, verifies model readiness, discovers eligible GitHub issues, and displays a preview. It does not execute issue work.
 
-## Reported test coverage
+## Current status
 
-The last user-provided report says **20/20 tests passed** after local commit `919f41f`. This report has not been independently rerun from this repository; regard it as a reported result, not an independently verified result.
+The dispatcher implementation is being developed and tested in the local LyServer checkout on the known branch `feature/dispatcher-v02`. The implementation has not been independently verified from this documentation repository, and the source should not be assumed to exist on this repository's `main` branch.
 
-| Test | Purpose |
+A review patch named `dispatcher-stage1-review.patch` was uploaded to this repository. It is a text diff, not a runnable program. Static review of that patch showed changes addressing several prior concerns, including empty arguments, real `.cmd` wrapper coverage, command resolution for supported script types, clean-tree test preconditions, and broader before/after GitHub-state checks. These observations do not replace running the final committed test suite.
+
+A prior local report stated **20/20 tests passed** after commit `919f41f`. That result was reported by the user and has not been independently rerun here. Treat it as a reported result only until the final output and commit are checked.
+
+## Intended Stage 1 behavior
+
+1. Load local configuration and reject missing or invalid required values.
+2. Verify required commands and dependencies.
+3. Validate the target LyServer path and require a safe working-tree state.
+4. Run a bounded model readiness request through OpenCode and require the exact final non-empty response `PONG`.
+5. Discover issues labelled `ready-for-opencode`, excluding issues labelled `in-progress`.
+6. Display a preview and write logs outside the LyServer working tree.
+7. Exit without running issue instructions or making repository/GitHub changes.
+
+## Test coverage to verify
+
+| Area | Required check |
 |---|---|
-| T1 | Command-line argument quoting, including spaces, quotes, backslashes and Unicode |
-| T2 | Accept only the exact final non-empty response `PONG` |
-| T3 | Handle a missing executable |
-| T4 | Stop when the configuration file is missing |
-| T5a | Reject an empty required configuration value |
-| T5b | Reject a negative timeout |
-| T5c | Reject a log directory inside the repository |
-| T6a | Stop when the working tree is dirty |
-| T6b | Do not ping the model after the dirty-tree preflight fails |
-| T7 | Stop safely when model ping times out |
-| T8 | Stop safely when the configured model is unavailable |
-| T9 | Run the full preflight and preview path |
-| T10a | Check that GitHub issue labels remain unchanged |
-| T10b | Check Pull Request state (current test is too narrow; see open items) |
-| T10c | Check that the repository working tree remains clean |
-| T11 | Test path-containment boundary cases |
-| T12a | Report a process timeout |
-| T12b | Terminate a child process tree on timeout |
-| T12c | Do not terminate an unrelated sentinel process |
-| T13 | Check log order: Git/tree checks, ping, pong, issue discovery, preview |
+| Argument handling | Spaces, quotes, backslashes, Unicode, and explicit empty arguments |
+| Command wrappers | Real `.cmd` wrapper invocation with representative Windows metacharacters; documented unsupported cases must fail safely |
+| Command resolution | Explicit behavior for supported executable and script types, including `.exe`, `.cmd`, and `.ps1` where intended |
+| Readiness response | Accept only exact final non-empty `PONG`; reject unexpected responses |
+| Configuration | Missing file, empty required values, invalid timeout, and unsafe log path |
+| Repository preflight | Reject a dirty tree and do not continue to the model call after preflight failure |
+| Timeouts | Report timeout, terminate the relevant child process tree, and avoid terminating an unrelated process |
+| Model failures | Handle missing command, unavailable model, non-zero exit, and timeout |
+| Issue discovery | Include eligible issues and exclude issues marked `in-progress` |
+| No side effects | Compare GitHub issue labels and relevant PR state before/after; confirm the working tree remains clean |
+| Logging | Verify useful event order and diagnostic errors without leaking secrets |
 
-## Required review fixes before acceptance
+The actual test names and count may differ in the final implementation. Use the committed test harness as the source of truth and record the exact command, output, and commit ID.
 
-1. **Empty arguments (T1):** ensure an empty argument is passed as an explicit empty string; add a case such as `before, "", after`.
-2. **Windows .cmd quoting:** Windows command-line quoting alone does not guarantee safe handling of `cmd.exe /c` metacharacters. Add a real wrapper test for spaces, quotes and shell metacharacters, or use a safer invocation strategy.
-3. **Command resolution:** verify whether `.ps1` scripts are actually returned by `Get-Command -CommandType Application`. Explicitly define supported command types and test `.exe`, `.cmd` and `.ps1` where intended.
-4. **Test preconditions and T10b:** require a clean working tree before the test harness begins. Improve T10b by capturing and comparing the full relevant PR state before and after the run, rather than checking only specific PR numbers.
+## Acceptance checklist
 
-## Acceptance sequence
+- [ ] Developer has finished the current fixes.
+- [ ] Tests start with the required clean working-tree precondition.
+- [ ] Full test suite passes after the final code changes are committed.
+- [ ] Full test output and exact commit ID are saved.
+- [ ] Final diff and working-tree status are inspected.
+- [ ] The test harness demonstrates no unintended repository or GitHub changes.
+- [ ] Configuration example contains placeholders only; real config and logs are ignored.
+- [ ] Source, tests, and documentation agree.
+- [ ] Stage 1 is explicitly accepted before any push/PR decision or Stage 2 work.
 
-1. Apply the four targeted fixes on the existing feature branch.
-2. Start the test harness only when the repository is clean.
-3. Run the full test suite after the fixes have been committed.
-4. Save the full test output and commit IDs.
-5. Review the final diff and verify the working tree is clean.
-6. Only then decide whether to push the branch and open a review PR.
-7. Do not start Stage 2 until Stage 1 is explicitly accepted.
+## Safety boundary
 
-## Reported local history
+Stage 1 must not modify application files, issue labels, branches, commits, pull requests, or other GitHub state. It must not execute task instructions. If any of these changes occur unexpectedly, stop and investigate before using the dispatcher again.
 
-Known local branch: `feature/dispatcher-v02`, reportedly five commits ahead of `origin/dev @ 054ef0a`. The last reported commit is `919f41f`. These details are from the user's report and have not been independently verified here.
+## Known development references
+
+- Local implementation branch reported: `feature/dispatcher-v02`
+- Last reported local commit: `919f41f`
+- Review patch in this repository: [`dispatcher-stage1-review.patch`](https://github.com/shatVM/LyServer-Dispatcher/blob/main/dispatcher-stage1-review.patch)
+
+The branch/commit details are historical user-reported context and are not independently verified by this document.

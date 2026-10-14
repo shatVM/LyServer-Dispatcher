@@ -1224,13 +1224,22 @@ $realStatusFinal = & git -C $realRepoPath status --porcelain | Out-String
 $realWorktreesFinal = @((& git -C $realRepoPath worktree list --porcelain | Out-String) -split "`r?`n" | Where-Object { $_ -match '^worktree ' }).Count
 $realHiddenFinal = @(& git -C $realRepoPath ls-files -v | Where-Object { $_ -cmatch '^S\s' -or $_ -cmatch '^[a-z]' })
 $realIdentical = ($realStatusFinal -ceq $realStatusBefore)
-Test-Case 'T40c real repository identical to the T0 baseline, no index flags' ($realIdentical -and $realHiddenFinal.Count -eq 0) ("status identical: {0}; hidden index entries: {1}" -f $realIdentical, $realHiddenFinal.Count)
+# Report the exact porcelain delta when the real-repository invariant fails.
+# This is diagnostic only: it never changes the real repository or its index.
+$realStatusBeforeLines = @($realStatusBefore -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$realStatusFinalLines = @($realStatusFinal -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$realStatusAdded = @($realStatusFinalLines | Where-Object { $realStatusBeforeLines -cnotcontains $_ })
+$realStatusRemoved = @($realStatusBeforeLines | Where-Object { $realStatusFinalLines -cnotcontains $_ })
+$realStatusDetail = "status identical: {0}; hidden index entries: {1}; added=[{2}]; removed=[{3}]" -f `
+    $realIdentical, $realHiddenFinal.Count, ($realStatusAdded -join ' | '), ($realStatusRemoved -join ' | ')
+Test-Case 'T40c real repository identical to the T0 baseline, no index flags' ($realIdentical -and $realHiddenFinal.Count -eq 0) $realStatusDetail
 Test-Case 'T40d real repository worktrees unchanged (none added by tests)' ($realWorktreesFinal -eq $realWorktreesBefore) ("worktrees {0} (baseline {1})" -f $realWorktreesFinal, $realWorktreesBefore)
 $stage1StatusFinal = & git -C $repoPath status --porcelain | Out-String
 $gitRepoTStatusFinal = & git -C $gitRepoT status --porcelain | Out-String
 $cwdLogsFinal = @(Get-ChildItem -Path (Get-Location).Path -Filter 'dispatcher-*.log' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName } | Sort-Object)
 $cwdLogsAdded = @($cwdLogsFinal | Where-Object { $cwdLogsBefore -notcontains $_ })
-Test-Case 'T40e temporary repositories clean after the suite' ([string]::IsNullOrWhiteSpace($stage1StatusFinal) -and [string]::IsNullOrWhiteSpace($gitRepoTStatusFinal) -and $cwdLogsAdded.Count -eq 0) ("stage1 clean: {0}; t2x clean: {1}; stray logs in suite CWD: {2}" -f [string]::IsNullOrWhiteSpace($stage1StatusFinal), [string]::IsNullOrWhiteSpace($gitRepoTStatusFinal), $cwdLogsAdded.Count)
+$cwdLogNamesAdded = @($cwdLogsAdded | ForEach-Object { [IO.Path]::GetFileName($_) })
+Test-Case 'T40e temporary repositories clean after the suite' ([string]::IsNullOrWhiteSpace($stage1StatusFinal) -and [string]::IsNullOrWhiteSpace($gitRepoTStatusFinal) -and $cwdLogsAdded.Count -eq 0) ("stage1 clean: {0}; t2x clean: {1}; stray logs in suite CWD: {2} [{3}]" -f [string]::IsNullOrWhiteSpace($stage1StatusFinal), [string]::IsNullOrWhiteSpace($gitRepoTStatusFinal), $cwdLogsAdded.Count, ($cwdLogNamesAdded -join ', '))
 
 # --- summary --------------------------------------------------------------
 $failed = @($script:Results | Where-Object { -not $_.Passed })
